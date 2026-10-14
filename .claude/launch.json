@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "london",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8645",
+        "--directory",
+        "/Users/aabarakov/projects/london-by-building/web"
+      ],
+      "port": 8645
+    }
+  ]
+}
