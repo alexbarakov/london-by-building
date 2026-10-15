@@ -91,7 +91,7 @@ const NL_UI = {
   'Cancel': 'Annuleren',
   'Click the map where the walk should start.': 'Klik op de kaart waar de wandeling moet beginnen.',
   'This browser does not share its location.': 'Deze browser deelt geen locatie.',
-  'You seem to be outside the city, so the walk starts at the Markt.': 'Je lijkt buiten de stad te zijn, dus de wandeling begint op de Markt.',
+  'You seem to be outside the city, so the walk starts at {s}.': 'Je lijkt buiten de stad te zijn, dus de wandeling begint bij {s}.',
   'The location was not shared. Pick a start on the map instead.': 'De locatie werd niet gedeeld. Kies het begin op de kaart.',
   'No stories within reach. Try a longer walk or more interests.': 'Geen verhalen binnen bereik. Probeer een langere wandeling of meer interesses.',
   'about {m} min': 'ongeveer {m} min',
@@ -1193,7 +1193,7 @@ function requestLocation() {
   navigator.geolocation.getCurrentPosition(pos => {
     locating = false;
     const [x, z] = fromLatLon(pos.coords.latitude, pos.coords.longitude);
-    if (Math.hypot(x, z) > 6000) { renderWalkPlanner(t('You seem to be outside the city, so the walk starts at the Markt.')); return; }
+    if (Math.hypot(x, z) > 6000) { renderWalkPlanner(t('You seem to be outside the city, so the walk starts at {s}.').replace('{s}', L10(STARTS[0]))); return; }
     walkPrefs.at = [x, z]; walkPrefs.atLabel = t('Your location'); renderWalkPlanner();
   }, () => { locating = false; renderWalkPlanner(t('The location was not shared. Pick a start on the map instead.')); },
   { enableHighAccuracy: true, timeout: 10000 });
