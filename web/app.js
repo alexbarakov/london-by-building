@@ -7,6 +7,7 @@ THREE.ColorManagement.enabled = false;
 const SKY = '#e4e8ea';
 const LAND = '#f4f3ef';
 const WATER = '#b5c7c6';
+const PARK = '#e2ead9';  // barely green: parks read as ground, not as a layer
 const MAQUETTE = '#efeee9';
 const GROUP_COLORS = ['#1f3f9a', '#d0312d', '#d99a12', '#2e8b57', '#7b3fa0', '#00909a', '#8c5a2b', '#d6336c'];
 const MAX_GROUPS = GROUP_COLORS.length;
@@ -127,12 +128,18 @@ async function loadPolygons(url) {
 }
 const flat = new THREE.Group();
 scene.add(flat);
-const [landGeo, waterGeo] = await Promise.all([loadPolygons('data/land.bin'), loadPolygons('data/water.bin')]);
+const [landGeo, waterGeo, parkGeo] = await Promise.all([loadPolygons('data/land.bin'), loadPolygons('data/water.bin'),
+  fetch('data/parks.bin', { method: 'HEAD' }).then(r => r.ok ? loadPolygons('data/parks.bin') : null).catch(() => null)]);
 const land = new THREE.Mesh(landGeo, new THREE.MeshBasicMaterial({ color: LAND }));
 const water = new THREE.Mesh(waterGeo, new THREE.MeshBasicMaterial({ color: WATER }));
 land.position.y = -0.05;
 water.position.y = -0.4;
 flat.add(land, water);
+if (parkGeo) {
+  const parks = new THREE.Mesh(parkGeo, new THREE.MeshBasicMaterial({ color: PARK }));
+  parks.position.y = 0.02;
+  flat.add(parks);
+}
 
 // ---------- Street and canal names ----------
 // Flat on the ground, turned along the street (pipeline/s07_labels.py). Textures are drawn on first use.

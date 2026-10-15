@@ -20,7 +20,21 @@ def main():
     c.sql(f"""COPY (SELECT id, names.primary AS name, class, subtype, geometry
           FROM read_parquet('{R}/theme=base/type=water/*', hive_partitioning=1) WHERE {OVERLAP})
           TO 'data/raw/overture_water.parquet' (FORMAT parquet)""")
+    parks()
+
+
+def parks():
+    """Parks, gardens, commons and churchyards (Overture land use, from OpenStreetMap, ODbL)."""
+    c = duckdb.connect()
+    c.sql("INSTALL httpfs; LOAD httpfs; SET s3_region='us-west-2';")
+    c.sql(f"""COPY (SELECT id, names.primary AS name, class, subtype, geometry
+          FROM read_parquet('{R}/theme=base/type=land_use/*', hive_partitioning=1)
+          WHERE {OVERLAP} AND (subtype IN ('park', 'recreation', 'cemetery', 'grass')
+                OR class IN ('park', 'garden', 'recreation_ground', 'village_green', 'common', 'nature_reserve',
+                             'cemetery', 'grave_yard', 'playground', 'pitch', 'grass', 'meadow')))
+          TO 'data/raw/overture_parks.parquet' (FORMAT parquet)""")
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    parks() if sys.argv[1:] == ["parks"] else main()

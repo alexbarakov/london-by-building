@@ -1,4 +1,5 @@
-"""Water (Overture base water: OpenStreetMap, ODbL) and the city outline, in the viewer's local frame.
+"""Water and parks (Overture base water and land use: OpenStreetMap, ODbL) and the city outline, in the viewer's
+local frame.
 
 water.bin / land.bin layout (little-endian):
   u32 nPoly, nRing, nVert; u32 ringStart[nPoly+1]; u32 vertStart[nRing+1]; f32 xz[2*nVert]
@@ -48,6 +49,16 @@ def main():
     water = [p for p in polygons(water) if p.area > 30]
     land = city.difference(shapely.MultiPolygon(water)).simplify(1.0)
     land = [p for p in polygons(land) if p.area > 30]
+    # parks, commons, churchyards and public gardens: a pale green under the buildings
+    raw = pd.read_parquet("data/raw/overture_parks.parquet")
+    g = gpd.GeoDataFrame(raw.drop(columns="geometry"), geometry=gpd.GeoSeries.from_wkb(raw.geometry), crs=4326).to_crs(CRS)
+    g = g[g.geometry.geom_type.isin(["Polygon", "MultiPolygon"])]
+    keep = g["class"].isin(["park", "village_green", "recreation_ground", "nature_reserve", "cemetery", "grave_yard",
+                            "common", "dog_park"]) | ((g["class"] == "garden") & (g.name.notna() | (g.area > 2000)))
+    green = shapely.make_valid(g[keep].union_all()).intersection(city).difference(shapely.MultiPolygon(water))
+    green = [p for p in polygons(green.simplify(1.0)) if p.area > 150]
+    (OUT / "parks.bin").write_bytes(pack(green))
+    print(f"parks {len(green)} polys {sum(p.area for p in green)/1e6:.1f} km²")
     (OUT / "water.bin").write_bytes(pack(water))
     (OUT / "land.bin").write_bytes(pack(land))
     print(f"water {len(water)} polys {sum(p.area for p in water)/1e6:.1f} km², {(OUT/'water.bin').stat().st_size/1e6:.2f} MB;"
