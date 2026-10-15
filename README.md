@@ -24,6 +24,10 @@ open data ──► pipeline/ (Python) ──► web/data/ (binary tiles + JSON)
 | `s00_fetch_wikidata` | Wikidata items in the area that are listed or have an English Wikipedia article |
 | `s01_load` | Overture footprints clipped to the boroughs, joined to Colouring London's dates and listing |
 | `s01c_heights` | Height of each footprint from the LIDAR |
+| `s01d_1890s` | Share of each footprint covered by buildings of the 1891–96 OS map |
+| `s00_fetch_nhle_text`, `s00_fetch_local_lists`, `s00_fetch_os_plans` | Listing descriptions, Lambeth and Southwark local lists, OS 1:1250 plan tiles (NLS) |
+| `s01f_os_plans` | Whether each footprint is drawn on the OS plans of the 1940s–70s, and the sheet's year |
+| `s01e_ages` | Every sourced date for every footprint, one row per source |
 | `s02_attributes` | Years (known only), periods, floors |
 | `s05_layers` | Resolves every context layer to a bit per building |
 | `s03_tiles` | Packs 600 m tiles into 8 bundles, writes per-building attributes and the city config |
@@ -39,11 +43,16 @@ Raw inputs (not in the repository): `data/raw/boundary.json` (ONS borough bounda
 
 ## Data decisions
 
-- **Years.** London has no open register of construction years. A building shows a year only where Colouring London
-  contributors recorded one (about one in five); a year with a range is
-  drawn paler and marked "c.". The computed guesses Colouring London also holds are left out: those marked
-  'Computational generation' and the Alan Turing Institute's 2020 test, filed under 'Historical map'. Every other
-  building is grey and appears only in today's city.
+- **Years.** London has no open register of construction years. Each building takes its date from the most precise
+  open source that has one (see `s01e_ages` for the list and the order), and the card names the source. Ranges (a
+  listing's century, an energy-certificate band, "after 1952" because the building is not yet on that plan) are
+  drawn paler. Map readings are used only where they held up against known years: a footprint with no building on
+  the 1890s map was built after 1893 in 93 % of dated cases, one not yet on the 1940s–50s plan after that plan's year
+  in 88 %. No model estimates (Colouring London's computed guesses, the Alan Turing Institute's 2020 test) and
+  nothing borrowed from neighbours: undated buildings stay grey.
+  `data/raw/ages/` holds inputs prepared once: the LBSM2 age bands per UPRN (London Datastore), Price Paid new-build
+  candidates per footprint (Land Registry PPD joined through the ONS UPRN Directory), LDD completions matched by site
+  point, OSM date and Wikidata tags, and Colouring London contributors' eras from its edit history.
 - **Heights.** The 70th percentile of the LIDAR surface within each footprint, over the median terrain just
   outside it.
 - **Stories.** Every story names its Wikipedia article and its Wikidata item; `s08_curated` checks the article contains

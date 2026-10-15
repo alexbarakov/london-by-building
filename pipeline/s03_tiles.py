@@ -130,11 +130,11 @@ def main():
     # Per-building lookup for hover: BAG id, height (dm), floors source, date flag.
     bag = b.identificatie.str.slice(-16).astype("int64").to_numpy()
     attrs = np.zeros(len(b), dtype=[("bag", "<f8"), ("h", "<u2"), ("fsrc", "u1"), ("flag", "u1"), ("year", "<i2"), ("orig", "<i2"), ("mon", "<u4"), ("lay0", "<u4"), ("lay1", "<u4"), ("wk", "<i4"),
-                                    ("energy", "u1"), ("pad", "u1", 3), ("x", "<f4"), ("z", "<f4")])
+                                    ("energy", "u1"), ("src", "u1"), ("hi", "<i2"), ("x", "<f4"), ("z", "<f4")])
     attrs["bag"] = bag
     attrs["h"] = np.round(b.height.fillna(0) * 10).clip(0, 65535)
     attrs["fsrc"] = b.floors_src; attrs["flag"] = b.date_flag
-    attrs["year"] = b.year; attrs["orig"] = b.year
+    attrs["year"] = b.year; attrs["orig"] = b.year_lo; attrs["hi"] = b.year_hi; attrs["src"] = b.year_src
     attrs["mon"] = pd.to_numeric(b.planning_list_id, errors="coerce").fillna(0).astype(int)
     attrs["lay0"] = b.lay0; attrs["lay1"] = b.lay1
     wki = Path("data/wiki_index.parquet")
@@ -147,9 +147,16 @@ def main():
 
     known = b[b.year > 0]
     years = known.year.to_numpy()
+    # A building dated to a range counts in the timeline's bars spread evenly over the range, so a band such as
+    # 'before 1900' does not pile up on one year; it still appears on the map in the year it is drawn at.
     hist = {}
-    for p, y in zip(known.period, years):
-        hist.setdefault(int(y), [0] * len(PERIODS))[p] += 1
+    for p, y, lo, hi, fl in zip(known.period, years, known.year_lo, known.year_hi, known.date_flag):
+        lo, hi = (int(lo), int(hi)) if fl == 1 and 0 < lo < hi else (int(y), int(y))
+        lo = max(lo, 1800) if hi >= 1800 else lo
+        w = 1.0 / (hi - lo + 1)
+        for yy in range(lo, hi + 1):
+            hist.setdefault(yy, [0.0] * len(PERIODS))[p] += w
+    hist = {y: [round(v, 2) for v in vs] for y, vs in hist.items()}
     config = dict(
         city=SLUG, label=NAME, tileSize=TILE, origin=DAM,
         home=dict(x=0, z=200, azimuth=200, elevation=38, span=7000),

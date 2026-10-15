@@ -218,6 +218,7 @@ const col = c => new THREE.Color(c);
 const uniforms = {
   uYear: { value: config.yearMax },
   uYearMax: { value: config.yearMax },
+  uExactOnly: { value: 0 },
   uYearFrom: { value: config.yearMin - 1 },
   uMode: { value: MODE.period },
   uPalette: { value: periods.map(p => col(p.color)) },
@@ -239,7 +240,7 @@ const uniforms = {
 const VERT = /* glsl */`
   in float bld;
   uniform sampler2D uAttr;
-  uniform float uYearMax;
+  uniform float uYearMax, uExactOnly;
   uniform float uYear, uYearFrom, uMode, uHover, uSelected, uNow, uBorn, uPlaying, uRise, uLayerAt;
   uniform vec3 uPalette[${periods.length}];
   uniform float uMask[${periods.length}];
@@ -276,6 +277,7 @@ const VERT = /* glsl */`
     float vis = uMode < 1.5 ? uMask[period] : 1.0;
     float g = clamp((uYear - year + 1.0) / uRise, 0.0, 1.0);
     if (flag == 7) g = uYear >= uYearMax - 0.5 ? 1.0 : 0.0;  // year not known: present only today
+    if (uExactOnly > 0.5 && uMode < 0.5 && flag != 0) g = 0.0;
     g = g * g * (3.0 - 2.0 * g);
     if (g <= 0.003 || vis <= 0.003) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
 
@@ -428,6 +430,25 @@ function pick(x, y) {
 }
 
 // ---------- Building lookup ----------
+// Where each year comes from (pipeline/s02_attributes.py SOURCES), and how to read a range.
+const YEAR_SOURCE = [null,
+  ['Colouring London contributors', 'https://colouringbritain.org'],
+  ['the National Heritage List entry (Historic England)', null],
+  ['Wikidata, through the building’s OpenStreetMap entry', null],
+  ['OpenStreetMap contributors', null],
+  ['the London Development Database (GLA): completion of the scheme', null],
+  ['HM Land Registry: first sale of the new-built homes', null],
+  ['the borough’s local list', null],
+  ['an era a Colouring London contributor chose', null],
+  ['energy certificates of the homes inside, via the GLA London Building Stock Model', null],
+  ['the Ordnance Survey maps: no building here on the 1890s map, or none yet on the 1:1250 plan of the 1940s–50s', null],
+];
+function yearText(b) {
+  if (b.flag !== 1 || !b.orig || !b.hi) return String(b.year);
+  if (b.orig <= 1800 && b.hi === 1899) return 'before 1900';
+  if (b.hi >= 2026) return `after ${b.orig}`;
+  return b.orig === b.hi ? `c. ${b.year}` : `${b.orig}–${b.hi}`;
+}
 const DATE_NOTE = [
   null,
   'Dated by comparing historical maps or from a range a contributor gave: read it as “around then”.',
@@ -452,6 +473,8 @@ function building(gid) {
     mon: attrs.getUint32(o + 16, true),
     wk: attrs.getInt32(o + 28, true),
     energy: attrs.getUint8(o + 32),
+    src: attrs.getUint8(o + 33),
+    hi: attrs.getInt16(o + 34, true),
     x: attrs.getFloat32(o + 36, true),
     z: attrs.getFloat32(o + 40, true),
     groups: groupsByBit.filter(g => g.bit < 32 ? (lay0 >>> g.bit) & 1 : (lay1 >>> (g.bit - 32)) & 1),
@@ -510,7 +533,7 @@ function cardHtml(gid, pinned) {
     [t('Storeys'), b.fsrc === 0 ? t('from the 3D BAG model') : t('height ÷ 3.2 m')],
     w?.architects?.length && [t(w.architects.length > 1 ? 'Architects' : 'Architect'), w.architects.map(esc).join(', ')],
     w?.styles?.length && [t('Style'), w.styles.map(esc).join(', ')],
-    b.mon && [t('National monument'), `${LANG === 'nl' ? 'nr.' : 'no.'} ${b.mon}`],
+    b.mon && ['Listed building', `no. ${b.mon}`],
     b.energy && [t('Energy label'), `<span class="elabel" style="background:${ENERGY_COLORS[b.energy]}">${config.energy.labels[b.energy - 1]}</span>`],
   ].filter(Boolean);
   const credit = im && (pinned
@@ -518,21 +541,23 @@ function cardHtml(gid, pinned) {
     : `${esc(im.artist || 'Wikimedia Commons')}${im.license ? `, ${esc(im.license)}` : ''}`);
   const sources = [
     wikiOf(w)?.url && link(wikiOf(w).url, t(wikiOf(w).lang === 'nl' ? 'Dutch Wikipedia' : 'Wikipedia')),
-    b.mon && link(`https://monumentenregister.cultureelerfgoed.nl/monumenten/${b.mon}`, t('Monument register')),
+    b.mon && link(`https://historicengland.org.uk/listing/the-list/list-entry/${b.mon}`, 'National Heritage List entry'),
   ].filter(Boolean);
   const inLayers = b.groups.map(g => {
     const note = g.layer.notes?.[b.bag];
     return `<li><i style="background:${groupColor(g)}"></i><div><b>${esc(tr(g.layer, 'title'))}</b> <span>${esc(tr(g, 'label'))}</span>
       ${pinned && note ? `<p>${esc(tr(note, 'story'))}${note.source ? ` ${link(note.source, t('Source'))}` : ''}</p>` : ''}</div></li>`;
   }).join('');
-  const dating = DATE_NOTE[b.flag] && t(DATE_NOTE[b.flag]);
+  const mapNote = b.src === 10 && (b.orig === 1893 ? 'No building stood on this spot on the Ordnance Survey map of 1891–96.'
+    : `Not yet drawn on the Ordnance Survey 1:1250 plan of ${b.orig}${b.hi < 2026 ? `; drawn on the plan of ${b.hi}` : ''}.`);
+  const dating = [mapNote || (YEAR_SOURCE[b.src] ? `Date from ${YEAR_SOURCE[b.src][0]}.` : ''), b.flag === 7 ? t(DATE_NOTE[7]) : ''].filter(Boolean).join(' ');
   return `
     ${pinned ? '<button class="card-close" aria-label="Close">×</button>' : ''}
     ${im ? `<figure class="photo"><img src="${esc(im.thumb)}" alt="" onerror="this.parentElement.remove()"><figcaption>${t('Photo')}: ${credit}</figcaption></figure>`
       : ''}
     <header class="card-head">
       ${w?.label ? `<h3>${esc(tr(w, 'label'))}</h3>` : ''}
-      <div class="when"><span class="y">${b.flag === 7 ? `<span class="unknown">${t('Year not known')}</span>` : `${[1, 2, 4].includes(b.flag) ? 'c. ' : ''}${b.year}`}</span>
+      <div class="when"><span class="y">${b.flag === 7 ? `<span class="unknown">${t('Year not known')}</span>` : yearText(b)}</span>
         <span class="period"><i style="background:${period.color}"></i>${esc(t(period.label))}</span></div>
     </header>
     ${pinned && wikiOf(w)?.extract ? `<section><p class="extract">${esc(wikiOf(w).extract)}</p></section>` : ''}
@@ -846,9 +871,12 @@ function renderPanel() {
   if (mode === MODE.period) {
     panel.innerHTML = `<h2>${t('Built in')}</h2><div class="swatches">${periods.map((p, i) => `
       <button class="swatch" data-i="${i}" aria-pressed="${!!maskTarget[i]}">
-        <i style="background:${p.color}"></i><span>${t(p.label)}</span><span class="n">${fmt(totals[i])}</span>
+        <i style="background:${p.color}"></i><span>${t(p.label)}</span><span class="n">${fmt(Math.round(totals[i]))}</span>
       </button>`).join('')}</div>
-      <p class="note">${t('Click a period to see it alone. Paler buildings have an approximate year.')}</p>`;
+      <label class="exact-only"><input type="checkbox" ${uniforms.uExactOnly.value ? 'checked' : ''}> Exact years only</label>
+      <p class="note">Click a period to see it alone. Paler buildings are dated to a range: a century, an energy
+      certificate band or a bracket between two maps. Grey ones have no date in any open source yet.</p>`;
+    panel.querySelector('.exact-only input').onchange = e => { uniforms.uExactOnly.value = e.target.checked ? 1 : 0; };
     panel.querySelectorAll('.swatch').forEach(b => b.onclick = () => {
       const i = +b.dataset.i, m = maskTarget;
       const solo = m.every((v, j) => (j === i) === !!v);
@@ -859,7 +887,7 @@ function renderPanel() {
     panel.innerHTML = `<h2>${t('Storeys')}</h2>
       <div class="ramp" style="background:linear-gradient(90deg,#dbe3e6,#7da8bf,#2b5c8c,#0d1a40)"></div>
       <div class="ramp-scale"><span>1</span><span>3</span><span>8</span><span>20</span><span>40+</span></div>
-      <p class="note">${LANG === 'nl' ? `${fmt(config.stats.floorsBag3d)} gebouwen krijgen hun verdiepingen uit het 3D BAG-model; de rest, ${fmt(config.stats.floorsHeight)}, uit hun hoogte gedeeld door 3,2 m.` : `${fmt(config.stats.floorsBag3d)} buildings take their storeys from the 3D BAG model; the rest, ${fmt(config.stats.floorsHeight)}, from their height divided by 3.2 m.`}</p>`;
+      <p class="note">Storeys are each building's LIDAR height divided by 3.2 m; ${fmt(config.stats.lidar)} of ${fmt(config.stats.buildings)} heights are measured.</p>`;
   } else if (mode === MODE.energy) {
     const e = config.energy;
     panel.innerHTML = `<h2>${t('Energy label')}</h2><div class="energy-scale">${e.labels.map((l, i) => `
@@ -1029,7 +1057,7 @@ function drawHist() {
   if (Yf >= T0) { hctx.fillStyle = '#5d6266'; hctx.fillRect(xOf(Yf) - 0.5, 0, 1, plotH); }
   // at the end of the timeline the map shows the city as it stands, not a year that reads like a date
   document.getElementById('year').textContent = Y >= config.yearMax ? t('Today') : Math.round(Y);
-  document.getElementById('count').textContent = fmt(visibleCount());
+  document.getElementById('count').textContent = fmt(Math.round(visibleCount()));
 }
 
 let handle = null;

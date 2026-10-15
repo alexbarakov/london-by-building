@@ -62,17 +62,28 @@
     <ul>
       <li>Footprints: Overture Maps, from OpenStreetMap contributors and Microsoft. ODbL.</li>
       <li>Heights: Environment Agency LIDAR composite, 1 m. Open Government Licence.</li>
-      <li>Years and listing: Colouring London (Colouring Cities Research Programme) and its contributors; listing from Historic England. ODbL.</li>
+      <li>Years, most precise first:
+        Colouring London contributors (ODbL);
+        National Heritage List for England descriptions, Historic England (OGL), read from British Listed Buildings;
+        Wikidata (CC0) and OpenStreetMap (ODbL);
+        London Development Database completions, GLA (OGL);
+        HM Land Registry Price Paid Data, new-build sales, with the ONS UPRN Directory (OGL);
+        Lambeth and Southwark local lists (OGL);
+        construction age bands of the GLA London Building Stock Model 2, from energy certificates (OGL);
+        the Ordnance Survey map of 1891–96 as vectorised in <a href="https://doi.org/10.5281/zenodo.21282700" target="_blank" rel="noopener">A Layer of Late Victorian London</a> (Petitpierre, McDonough, Fleet and others, CC BY 4.0)
+        and the Ordnance Survey 1:1250 plans of the 1940s–70s, National Library of Scotland (CC BY).</li>
+      <li>Listing: Historic England, via Colouring London.</li>
       <li>Borough boundaries: Office for National Statistics. Open Government Licence.</li>
-      <li>The 1890s map: <a href="https://doi.org/10.5281/zenodo.21282700" target="_blank" rel="noopener">A Layer of Late Victorian London</a> by Petitpierre, McDonough, Fleet and others, footprints from the Ordnance Survey 1:1,056 map of 1891–1896. CC BY 4.0.</li>
       <li>Names, photos, stories: Wikidata, Wikipedia, Wikimedia Commons; each photo credits its author and licence.</li>
       <li>Street names and water: OpenStreetMap contributors. ODbL.</li>
     </ul>
     <h3>Method</h3>
-    <p>London has no open register of construction years, so a building shows a year only where Colouring London's
-    contributors recorded one; years with a range are paler and marked “c.”. Model estimates are left out.
-    The rest, about four in five, are grey and appear only in today's city. Heights are the 70th percentile of the
-    LIDAR surface over the ground around each footprint. Every hand-written story is checked against its Wikipedia article.</p>
+    <p>London has no open register of construction years, so each building takes its date from the most precise open
+    source that has one, and the card names it. An exact year is drawn in full colour; a range (a century in a listing,
+    an energy-certificate band, “after 1952” because the building is not yet on that year's map) is drawn paler and
+    can be hidden with “Exact years only”. Nothing is borrowed from neighbours and no model estimates are used:
+    buildings no source dates stay grey. Heights are the 70th percentile of the LIDAR surface over the ground around
+    each footprint. Every hand-written story is checked against its Wikipedia article.</p>
   </article>
 </dialog>
 
