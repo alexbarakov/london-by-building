@@ -6,24 +6,24 @@ layer (checked by s08_curated) or a 'Did you know' fact (s11_facts). s13_graph.p
 (id, type, English label, Dutch label, years, regex on the English text)
 """
 
-PERSON, EVENT, ORG = "person", "event", "organisation"
+PERSON, EVENT, ORG, ARCH = "person", "event", "organisation", "architect"
 
 ENTITIES = [
     # architects and builders
-    ("wren", PERSON, "Christopher Wren", "Christopher Wren", "1632–1723", r"\bWren"),
-    ("hooke", PERSON, "Robert Hooke", "Robert Hooke", "1635–1703", r"Hooke"),
-    ("hawksmoor", PERSON, "Nicholas Hawksmoor", "Nicholas Hawksmoor", "c. 1661–1736", r"Hawksmoor"),
-    ("inigojones", PERSON, "Inigo Jones", "Inigo Jones", "1573–1652", r"Inigo Jones"),
-    ("nash", PERSON, "John Nash", "John Nash", "1752–1835", r"John Nash|\bNash's"),
-    ("adam", PERSON, "Robert Adam", "Robert Adam", "1728–1792", r"Robert Adam"),
-    ("brunel", PERSON, "Isambard Kingdom Brunel", "Isambard Kingdom Brunel", "1806–1859", r"Brunel"),
-    ("gilbertscott", PERSON, "Giles Gilbert Scott", "Giles Gilbert Scott", "1880–1960", r"Giles Gilbert Scott"),
-    ("holden", PERSON, "Charles Holden", "Charles Holden", "1875–1960", r"Charles Holden|Holden's"),
-    ("leslie", PERSON, "Leslie Green", "Leslie Green", "1875–1908", r"Leslie Green"),
-    ("lubetkin", PERSON, "Berthold Lubetkin and Tecton", "Berthold Lubetkin en Tecton", "1901–1990", r"Lubetkin|Tecton"),
-    ("lasdun", PERSON, "Denys Lasdun", "Denys Lasdun", "1914–2001", r"Lasdun"),
-    ("goldfinger", PERSON, "Ernő Goldfinger", "Ernő Goldfinger", "1902–1987", r"Goldfinger"),
-    ("matcham", PERSON, "Frank Matcham", "Frank Matcham", "1854–1920", r"Matcham"),
+    ("wren", ARCH, "Christopher Wren", "Christopher Wren", "1632–1723", r"\bWren"),
+    ("hooke", ARCH, "Robert Hooke", "Robert Hooke", "1635–1703", r"Hooke"),
+    ("hawksmoor", ARCH, "Nicholas Hawksmoor", "Nicholas Hawksmoor", "c. 1661–1736", r"Hawksmoor"),
+    ("inigojones", ARCH, "Inigo Jones", "Inigo Jones", "1573–1652", r"Inigo Jones"),
+    ("nash", ARCH, "John Nash", "John Nash", "1752–1835", r"John Nash|\bNash's"),
+    ("adam", ARCH, "Robert Adam", "Robert Adam", "1728–1792", r"Robert Adam"),
+    ("brunel", ARCH, "Isambard Kingdom Brunel", "Isambard Kingdom Brunel", "1806–1859", r"Brunel"),
+    ("gilbertscott", ARCH, "Giles Gilbert Scott", "Giles Gilbert Scott", "1880–1960", r"Giles Gilbert Scott"),
+    ("holden", ARCH, "Charles Holden", "Charles Holden", "1875–1960", r"Charles Holden|Holden's"),
+    ("leslie", ARCH, "Leslie Green", "Leslie Green", "1875–1908", r"Leslie Green"),
+    ("lubetkin", ARCH, "Berthold Lubetkin and Tecton", "Berthold Lubetkin en Tecton", "1901–1990", r"Lubetkin|Tecton"),
+    ("lasdun", ARCH, "Denys Lasdun", "Denys Lasdun", "1914–2001", r"Lasdun"),
+    ("goldfinger", ARCH, "Ernő Goldfinger", "Ernő Goldfinger", "1902–1987", r"Goldfinger"),
+    ("matcham", ARCH, "Frank Matcham", "Frank Matcham", "1854–1920", r"Matcham"),
     # writers, artists, musicians, scientists
     ("dickens", PERSON, "Charles Dickens", "Charles Dickens", "1812–1870", r"Dickens"),
     ("pepys", PERSON, "Samuel Pepys", "Samuel Pepys", "1633–1703", r"Pepys"),
