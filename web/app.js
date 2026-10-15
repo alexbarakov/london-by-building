@@ -1681,6 +1681,7 @@ function applyStaticText() {
   document.querySelector('.walks-open span').textContent = LANG === 'nl' ? 'Route' : 'Walk';
   document.querySelector('.graph-open span').textContent = t('Graph');
   document.querySelector('.graph-open').href = LANG === 'nl' ? 'graph.html?lang=nl' : 'graph.html';
+  document.querySelector('.graph-open').href = LANG === 'nl' ? 'graph.html?lang=nl' : 'graph.html';
   document.querySelector('.quests-open span').textContent = t('Quests');
   document.querySelectorAll('[data-lang-block]').forEach(a => { a.hidden = a.dataset.langBlock !== LANG; });
   document.querySelectorAll('.modes button[data-mode]').forEach(b => { b.textContent = t(b.dataset.label); });
