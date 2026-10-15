@@ -26,6 +26,7 @@ open data ──► pipeline/ (Python) ──► web/data/ (binary tiles + JSON)
 | `s01c_heights` | Height of each footprint from the LIDAR |
 | `s01d_1890s` | Share of each footprint covered by buildings of the 1891–96 OS map |
 | `s00_fetch_nhle_text`, `s00_fetch_local_lists`, `s00_fetch_os_plans` | Listing descriptions, Lambeth and Southwark local lists, OS 1:1250 plan tiles (NLS) |
+| `s01g_spires` | Towers, spires and domes above the prisms, as 1 m columns from the LIDAR surface (trees and taller neighbours filtered out) |
 | `s01f_os_plans` | Whether each footprint is drawn on the OS plans of the 1940s–70s, and the sheet's year |
 | `s01e_ages` | Every sourced date for every footprint, one row per source |
 | `s02_attributes` | Years (known only), periods, floors |

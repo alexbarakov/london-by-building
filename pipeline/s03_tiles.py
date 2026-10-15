@@ -7,7 +7,9 @@ Tile layout (little-endian, every section 4-byte aligned):
           u32 lay0[nB]; u32 lay1[nB] (layer bits, see s05_layers); u32 partStart[nB+1]
   P       f32 height[nP]; u32 ringStart[nP+1]
   R       u32 vertStart[nR+1]; u8 hole[nR]
-  V       i16 xz[2*nV], decimetres from the tile origin
+  V       i16 xz[2*nV], decimetres from the tile origin; i16 y[nV], decimetres above the building's ground
+A part with height -1 is a face with its own heights per vertex (spire columns, s01g_spires); the viewer raises
+walls from the open edges of such faces down to the ground. Other parts are prisms of their height.
 """
 import json
 import struct
@@ -24,7 +26,7 @@ from .city import ORIGIN as DAM, SLUG, NAME
 TILE = 600.0
 SIMPLIFY = 0.25
 OUT = Path("web/data")
-MAGIC = 0x33424241  # 'ABB3'
+MAGIC = 0x34424241  # 'ABB4'
 ENERGY = ["G", "F", "E", "D", "C", "B", "A", "A+", "A++", "A+++", "A++++", "A+++++"]
 
 
@@ -41,14 +43,14 @@ def rings_of(geom):
     for poly in polys:
         if poly.is_empty:
             continue
-        yield shapely.get_coordinates(poly.exterior)[:-1], 0
+        yield shapely.get_coordinates(poly.exterior, include_z=poly.has_z)[:-1], 0
         for hole in poly.interiors:
-            yield shapely.get_coordinates(hole)[:-1], 1
+            yield shapely.get_coordinates(hole, include_z=poly.has_z)[:-1], 1
 
 
 def pack_tile(origin, rows):
     gid, year, flag, period, floors, energy, lay0, lay1, part_start = [], [], [], [], [], [], [], [], [0]
-    heights, ring_start, vert_start, holes, verts = [], [0], [0], [], []
+    heights, ring_start, vert_start, holes, verts, ys = [], [0], [0], [], [], []
     for b in rows:
         gid.append(b["gid"]); year.append(b["year"]); flag.append(b["flag"])
         period.append(b["period"]); floors.append(b["floors"])
@@ -58,14 +60,17 @@ def pack_tile(origin, rows):
             for ring, hole in rings_of(geom):
                 if len(ring) < 3:
                     continue
-                loc = (to_local(ring) - origin) * 10
+                loc = (to_local(ring[:, :2]) - origin) * 10
                 verts.append(np.round(loc).astype(np.int16))
+                ys.append(np.round(np.clip(ring[:, 2], 0, 3000) * 10).astype(np.int16) if ring.shape[1] == 3
+                          else np.zeros(len(ring), np.int16))
                 holes.append(hole)
                 vert_start.append(vert_start[-1] + len(ring))
             ring_start.append(len(holes))
         part_start.append(len(heights))
     nB, nP, nR = len(gid), len(heights), len(holes)
     V = np.concatenate(verts) if verts else np.zeros((0, 2), np.int16)
+    Y = np.concatenate(ys) if ys else np.zeros(0, np.int16)
     out = struct.pack("<5I2f", MAGIC, nB, nP, nR, len(V), *origin)
     out += pad4(np.array(gid, "<u4").tobytes())
     out += pad4(np.array(year, "<i2").tobytes())
@@ -80,6 +85,7 @@ def pack_tile(origin, rows):
     out += pad4(np.array(vert_start, "<u4").tobytes())
     out += pad4(np.array(holes, "u1").tobytes())
     out += pad4(V.astype("<i2").tobytes())
+    out += pad4(Y.astype("<i2").tobytes())
     return out
 
 
@@ -91,6 +97,13 @@ def main():
     # one part per building: its footprint at its LIDAR height
     geo = shapely.simplify(b.geometry.values, SIMPLIFY, preserve_topology=True)
     parts = {k: [(max(2.5, float(h)), g)] for k, h, g in zip(b.identificatie, b.height, geo)}
+    # towers, spires and domes above the prism, as fine columns from the LIDAR surface model (s01g_spires)
+    spires = Path("data/spires.parquet")
+    if spires.exists():
+        sp = gpd.read_parquet(spires)
+        for i, g in zip(sp.identificatie, sp.geometry):
+            if i in parts:
+                parts[i] = parts[i] + [(-1.0, p) for p in g.geoms]
 
     c = to_local(np.c_[b.geometry.centroid.x, b.geometry.centroid.y])
     b["tx"] = np.floor(c[:, 0] / TILE).astype(int)
