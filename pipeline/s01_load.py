@@ -29,12 +29,16 @@ def main():
     p["osm"] = p.sources.map(lambda s: "OpenStreetMap" in list(s))
 
     c = pd.read_parquet("data/raw/cb_london.parquet")
-    c = c[c.lat.notna()]
+    c = c[c.lat.notna()].merge(pd.read_parquet("data/raw/cb_london_detail.parquet")[["building_id", "date_source_detail"]],
+                               on="building_id", how="left")
     pts = gpd.GeoDataFrame(c, geometry=gpd.points_from_xy(c.lon, c.lat), crs=4326).to_crs(CRS)
     j = gpd.sjoin(pts, p[["identificatie", "geometry"]], predicate="within")
     j["src"] = j.date_source.fillna("")
-    # A contributor's year counts, with or without a cited source; the platform's computed guesses do not.
-    dated = j[j.y.notna() & (j.y > 1000) & (j.src != "Computational generation")]
+    # A contributor's year counts, with or without a cited source. The platform's computed guesses do not: those
+    # marked 'Computational generation', and the Alan Turing Institute's 2020 test, which filed binned map-based
+    # estimates (1890, 1910, 1930) under 'Historical map'.
+    turing = j.date_source_detail.fillna("").str.contains("Alan Turing", case=False)
+    dated = j[j.y.notna() & (j.y > 1000) & (j.src != "Computational generation") & ~turing]
     best = (dated.groupby(["identificatie", "y", "date_lower", "date_upper", "src"], dropna=False).size().rename("n").reset_index()
             .sort_values("n", ascending=False).drop_duplicates("identificatie"))
     p = p.merge(best.drop(columns="n"), on="identificatie", how="left")

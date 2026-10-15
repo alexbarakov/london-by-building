@@ -40,8 +40,9 @@ Raw inputs (not in the repository): `data/raw/boundary.json` (ONS borough bounda
 ## Data decisions
 
 - **Years.** London has no open register of construction years. A building shows a year only where Colouring London
-  contributors recorded one (about one in four), most often by comparing historical maps; a year with a range is
-  drawn paler and marked "c.". The computed guesses Colouring London also publishes are left out. Every other
+  contributors recorded one (about one in five); a year with a range is
+  drawn paler and marked "c.". The computed guesses Colouring London also holds are left out: those marked
+  'Computational generation' and the Alan Turing Institute's 2020 test, filed under 'Historical map'. Every other
   building is grey and appears only in today's city.
 - **Heights.** The 70th percentile of the LIDAR surface within each footprint, over the median terrain just
   outside it.
