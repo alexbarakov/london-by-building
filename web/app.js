@@ -555,16 +555,52 @@ fetch('data/facts.json').then(r => r.json()).then(f => { didYouKnow = f; }); // 
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const link = (href, text) => `<a href="${esc(href)}" target="_blank" rel="noopener">${esc(text)}</a>`;
 
-// Local metres → RD New → WGS84 (Schreutelkamp and Strang van Hees approximation, ~1 m).
+// Local metres <-> WGS84 through the British National Grid (OSGB36, Airy 1830) and a Helmert shift (~5 m).
+const AIRY = { a: 6377563.396, b: 6356256.909 }, WGS = { a: 6378137, b: 6356752.3142 };
+const BNG = { F0: 0.9996012717, lat0: 49 * Math.PI / 180, lon0: -2 * Math.PI / 180, E0: 400000, N0: -100000 };
+function toCart(lat, lon, e) {
+  const e2 = 1 - (e.b * e.b) / (e.a * e.a), nu = e.a / Math.sqrt(1 - e2 * Math.sin(lat) ** 2);
+  return [nu * Math.cos(lat) * Math.cos(lon), nu * Math.cos(lat) * Math.sin(lon), (1 - e2) * nu * Math.sin(lat)];
+}
+function fromCart([x, y, z], e) {
+  const e2 = 1 - (e.b * e.b) / (e.a * e.a), p = Math.hypot(x, y);
+  let lat = Math.atan2(z, p * (1 - e2));
+  for (let i = 0; i < 6; i++) { const nu = e.a / Math.sqrt(1 - e2 * Math.sin(lat) ** 2); lat = Math.atan2(z + e2 * nu * Math.sin(lat), p); }
+  return [lat, Math.atan2(y, x)];
+}
+function helmert([x, y, z], sign) {   // sign +1: OSGB36 -> WGS84, -1: the reverse
+  const tx = 446.448 * sign, ty = -125.157 * sign, tz = 542.060 * sign, s = -20.4894e-6 * sign;
+  const r = Math.PI / 648000, rx = 0.1502 * r * sign, ry = 0.2470 * r * sign, rz = 0.8421 * r * sign;
+  return [tx + (1 + s) * x - rz * y + ry * z, ty + rz * x + (1 + s) * y - rx * z, tz - ry * x + rx * y + (1 + s) * z];
+}
+function meridional(lat) {
+  const { a, b } = AIRY, n = (a - b) / (a + b), dl = lat - BNG.lat0, sl = lat + BNG.lat0;
+  return b * BNG.F0 * ((1 + n + 5 / 4 * n ** 2 + 5 / 4 * n ** 3) * dl - (3 * n + 3 * n ** 2 + 21 / 8 * n ** 3) * Math.sin(dl) * Math.cos(sl)
+    + (15 / 8 * n ** 2 + 15 / 8 * n ** 3) * Math.sin(2 * dl) * Math.cos(2 * sl) - 35 / 24 * n ** 3 * Math.sin(3 * dl) * Math.cos(3 * sl));
+}
 function toLatLon(x, z) {
-  const dX = (x + config.origin[0] - 155000) * 1e-5, dY = (config.origin[1] - z - 463000) * 1e-5;
-  const lat = 52.15517440 + (3235.65389 * dY - 32.58297 * dX ** 2 - 0.2475 * dY ** 2 - 0.84978 * dX ** 2 * dY
-    - 0.0655 * dY ** 3 - 0.01709 * dX ** 2 * dY ** 2 - 0.00738 * dX + 0.0053 * dX ** 4 - 0.00039 * dX ** 2 * dY ** 3
-    + 0.00033 * dX ** 4 * dY - 0.00012 * dX * dY) / 3600;
-  const lon = 5.38720621 + (5260.52916 * dX + 105.94684 * dX * dY + 2.45656 * dX * dY ** 2 - 0.81885 * dX ** 3
-    + 0.05594 * dX * dY ** 3 - 0.05607 * dX ** 3 * dY + 0.01199 * dY - 0.00256 * dX ** 3 * dY ** 2
-    + 0.00128 * dX * dY ** 4 + 0.00022 * dY ** 2 - 0.00022 * dX ** 2 + 0.00026 * dX ** 5) / 3600;
-  return [lat, lon];
+  const E = x + config.origin[0], N = config.origin[1] - z, { a, b } = AIRY, e2 = 1 - b * b / (a * a), F0 = BNG.F0;
+  let lat = BNG.lat0, M = 0;
+  do { lat = (N - BNG.N0 - M) / (a * F0) + lat; M = meridional(lat); } while (Math.abs(N - BNG.N0 - M) >= 0.00001);
+  const s = Math.sin(lat), nu = a * F0 / Math.sqrt(1 - e2 * s * s), rho = a * F0 * (1 - e2) / (1 - e2 * s * s) ** 1.5, eta2 = nu / rho - 1;
+  const t = Math.tan(lat), sec = 1 / Math.cos(lat), dE = E - BNG.E0;
+  const VII = t / (2 * rho * nu), VIII = t / (24 * rho * nu ** 3) * (5 + 3 * t * t + eta2 - 9 * t * t * eta2), IX = t / (720 * rho * nu ** 5) * (61 + 90 * t * t + 45 * t ** 4);
+  const X = sec / nu, XI = sec / (6 * nu ** 3) * (nu / rho + 2 * t * t), XII = sec / (120 * nu ** 5) * (5 + 28 * t * t + 24 * t ** 4),
+    XIIA = sec / (5040 * nu ** 7) * (61 + 662 * t * t + 1320 * t ** 4 + 720 * t ** 6);
+  const phi = lat - VII * dE ** 2 + VIII * dE ** 4 - IX * dE ** 6;
+  const lam = BNG.lon0 + X * dE - XI * dE ** 3 + XII * dE ** 5 - XIIA * dE ** 7;
+  const [la, lo] = fromCart(helmert(toCart(phi, lam, AIRY), 1), WGS);
+  return [la * 180 / Math.PI, lo * 180 / Math.PI];
+}
+function fromLatLon(latd, lond) {
+  const [lat, lon] = fromCart(helmert(toCart(latd * Math.PI / 180, lond * Math.PI / 180, WGS), -1), AIRY);
+  const { a, b } = AIRY, e2 = 1 - b * b / (a * a), F0 = BNG.F0, s = Math.sin(lat), c = Math.cos(lat), t = Math.tan(lat);
+  const nu = a * F0 / Math.sqrt(1 - e2 * s * s), rho = a * F0 * (1 - e2) / (1 - e2 * s * s) ** 1.5, eta2 = nu / rho - 1;
+  const M = meridional(lat), I = M + BNG.N0, II = nu / 2 * s * c, III = nu / 24 * s * c ** 3 * (5 - t * t + 9 * eta2),
+    IIIA = nu / 720 * s * c ** 5 * (61 - 58 * t * t + t ** 4), IV = nu * c, V = nu / 6 * c ** 3 * (nu / rho - t * t),
+    VI = nu / 120 * c ** 5 * (5 - 18 * t * t + t ** 4 + 14 * eta2 - 58 * t * t * eta2), dl = lon - BNG.lon0;
+  const N = I + II * dl ** 2 + III * dl ** 4 + IIIA * dl ** 6, E = BNG.E0 + IV * dl + V * dl ** 3 + VI * dl ** 5;
+  return [E - config.origin[0], -(N - config.origin[1])];
 }
 // The article in the reader's language when there is one.
 const wikiOf = w => (LANG === 'nl' && w?.wiki_nl?.extract ? w.wiki_nl : w?.wiki) || w?.wiki_nl;
@@ -786,7 +822,7 @@ function startQuest(q, n, sc = 0) {
   renderQuest();
 }
 function resetStep() { hintsShown = 0; solved = false; misses = 0; revealed = false; questFolded = false; }
-function closeQuest() { quest = null; questEl.hidden = true; }
+function closeQuest() { quest = null; questEl.hidden = true; markWalk(); }
 function setModeNamed(name) {
   if (name === 'floors' || name === 'energy') { setBuildingView(MODE[name]); return; }
   document.querySelector(`.modes button[data-mode="${MODE[name]}"]`)?.click();
@@ -852,6 +888,7 @@ function renderQuest() {
          ${s.answer.bags ? `<button class="q-reveal">${t('Show me')}</button>` : ''}
          <span class="q-worth">${tiles(stepTiles(), 3)}</span>`}</div>`;
   questEl.hidden = false;
+  markWalk();
   // On a phone the riddle folds to its title bar so the map stays usable; a tap on the bar opens it again.
   questEl.querySelector('header').onclick = () => { questFolded = !questFolded; questEl.classList.toggle('folded', questFolded); };
   questEl.querySelector('.q-close').onclick = closeQuest;
@@ -910,7 +947,8 @@ function questClick(gid) {
 // Walk shows as on while a walk is open; on a phone the timeline steps aside.
 function markWalk() {
   document.querySelector('.walks-open').setAttribute('aria-pressed', String(!!walkRoute));
-  document.body.classList.toggle('walking', !!walkRoute);
+  document.querySelector('.quests-open').setAttribute('aria-pressed', String(!!quest));
+  document.body.classList.toggle('walking', !!walkRoute || !!quest);  // on a phone the timeline steps aside
 }
 // ---------- Walks ----------
 // Where a walk can start besides the walker's location: the city config's list, else the map's centre.
@@ -927,15 +965,6 @@ walkGroup.renderOrder = 5;
 scene.add(walkGroup);
 let walkPrefs = { layers: [], start: 0, km: 3, loop: true, at: null, stops: 0 }, walkRoute = null, pickingStart = false;
 
-// WGS84 → local metres (inverse of toLatLon, Schreutelkamp and Strang van Hees, ~1 m).
-function fromLatLon(lat, lon) {
-  const p = 0.36 * (lat - 52.15517440), l = 0.36 * (lon - 5.38720621);
-  const X = 155000 + 190094.945 * l - 11832.228 * p * l - 114.221 * p * p * l - 32.391 * l ** 3 - 0.705 * p
-    - 2.34 * p ** 3 * l - 0.608 * p * l ** 3 - 0.008 * l * l + 0.148 * p * p * l ** 3;
-  const Y = 463000 + 309056.544 * p + 3638.893 * l * l + 73.077 * p * p - 157.984 * p * l * l + 59.788 * p ** 3
-    + 0.433 * l - 6.439 * p * p * l * l - 0.032 * p * l + 0.092 * l ** 4 - 0.054 * p * l ** 4;
-  return [X - config.origin[0], -(Y - config.origin[1])];
-}
 // Every building with a story, merged across layers: one stop can carry several stories.
 let poiCache = null;
 function pois() {
@@ -1304,6 +1333,47 @@ walksDlg.addEventListener('click', e => { if (e.target === walksDlg) walksDlg.cl
   }
 }
 
+// ---------- From the graph ----------
+// graph.html opens the map with ./?focus=<id>,<id>: the buildings of those people, events or places light up,
+// each selection in its own colour, and the rest of the city turns into a white model.
+const focusEl = document.getElementById('focus');
+const focusIds = (new URLSearchParams(location.search).get('focus') || '').split(',').filter(Boolean);
+if (focusIds.length) fetch('data/graph.json').then(r => r.json()).then(G => showFocus(G, focusIds)).catch(() => {});
+function showFocus(G, ids) {
+  const groups = [];
+  ids.forEach((id, i) => {
+    const node = G.nodes.find(n => n.id === id), place = G.places[id];
+    if (!node && !place) return;
+    const bags = place ? place.bags : G.links.filter(l => l.e === id).flatMap(l => G.places[l.p].bags);
+    const label = place ? place.name : (LANG === 'nl' && node.label_nl) || node.label;
+    groups.push({ label, color: i % GROUP_COLORS.length, gids: [...new Set(bags)].map(gidOf).filter(g => g >= 0) });
+  });
+  const gids = [], grp = [];
+  for (const g of groups) for (const gid of g.gids) {
+    if (!gids.includes(gid) && gids.length < FOCUS_MAX) { gids.push(gid); grp.push(g.color); }
+  }
+  if (!gids.length) return;
+  uniforms.uFocus.value = [...gids, ...Array(FOCUS_MAX - gids.length).fill(-1)];
+  uniforms.uFocusGroup.value = [...grp, ...Array(FOCUS_MAX - grp.length).fill(0)];
+  uniforms.uFocusN.value = gids.length;
+  const pts = gids.map(building);
+  const cx = pts.reduce((a, b) => a + b.x, 0) / pts.length, cz = pts.reduce((a, b) => a + b.z, 0) / pts.length;
+  const spread = Math.max(...pts.map(b => Math.hypot(b.x - cx, b.z - cz)));
+  flyTo(cx, cz, null, Math.min(4200, Math.max(380, spread * 2.4)));
+  const back = `graph.html?select=${encodeURIComponent(ids.join(','))}${LANG === 'nl' ? '&lang=nl' : ''}`;
+  focusEl.innerHTML = `<header><b>${t('From the graph')}</b><button class="f-close" aria-label="${t('Close')}">×</button></header>
+    <ul>${groups.map(g => `<li><i style="background:${GROUP_COLORS[g.color]}"></i><span>${esc(g.label)}</span>
+      <small>${g.gids.length}</small></li>`).join('')}</ul>
+    <div class="f-actions"><button class="make-walk">${t('Generate a walk')}</button><a class="f-back" href="${back}">${t('Back to the graph')}</a></div>`;
+  focusEl.hidden = false;
+  focusEl.querySelector('.make-walk').onclick = () => { focusEl.hidden = true; walkFromGroups(groups); };
+  focusEl.querySelector('.f-close').onclick = () => {
+    uniforms.uFocusN.value = 0;
+    focusEl.hidden = true;
+    const u = new URL(location.href); u.searchParams.delete('focus'); history.replaceState(null, '', u);
+  };
+}
+
 // ---------- Panel ----------
 const panelEl = document.getElementById('panel');
 const panel = document.getElementById('panel-body');
@@ -1609,6 +1679,8 @@ function applyStaticText() {
   document.querySelector('.dek').textContent = t('Every building standing today, by age and historical context.');
   document.querySelector('.about-open').textContent = t('About');
   document.querySelector('.walks-open span').textContent = LANG === 'nl' ? 'Route' : 'Walk';
+  document.querySelector('.graph-open span').textContent = t('Graph');
+  document.querySelector('.graph-open').href = LANG === 'nl' ? 'graph.html?lang=nl' : 'graph.html';
   document.querySelector('.quests-open span').textContent = t('Quests');
   document.querySelectorAll('[data-lang-block]').forEach(a => { a.hidden = a.dataset.langBlock !== LANG; });
   document.querySelectorAll('.modes button[data-mode]').forEach(b => { b.textContent = t(b.dataset.label); });
