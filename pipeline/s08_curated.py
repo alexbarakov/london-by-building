@@ -60,35 +60,73 @@ def coords(qid):
     return None
 
 
-def place(qid, nhle):
+def place_point(lon, lat, within=15):
+    pt = Point(TO.transform(lon, lat))
+    b = buildings()
+    hit = b[b.contains(pt)]
+    if hit.empty:
+        d = b.distance(pt)
+        hit = b[d == d.min()] if d.min() < within else hit
+    return list(hit.identificatie), "point"
+
+
+def place(qid, nhle, within=15):
     if nhle and listed().get(str(nhle)):
         return sorted(listed()[str(nhle)]), "listing"
     c = coords(qid)
     if not c:
         return [], "no coordinates"
-    pt = Point(TO.transform(*c))
-    b = buildings()
-    hit = b[b.contains(pt)]
-    if hit.empty:
-        d = b.distance(pt)
-        hit = b[d == d.min()] if d.min() < 15 else hit
-    return list(hit.identificatie), "point"
+    return place_point(*c, within)
+
+
+# Works OpenStreetMap still maps but articles say are gone: painted over or removed.
+GONE = {"One Nation Under CCTV", "Lie Lie Land", "Pulp Fiction", "Very little helps", "Phone tap", "Freedom for Humanity"}
+
+
+def osm_streetart(taken):
+    """Murals and graffiti mapped on OpenStreetMap (ODbL), pinned to the building whose wall carries them."""
+    d = json.load(open("data/raw/streetart/osm_streetart.json"))
+    out = []
+    for el in d.get("elements", []):
+        tags = el.get("tags", {})
+        name = tags.get("name") or tags.get("artwork_type", "mural").replace("_", " ").capitalize()
+        if any(g.lower() in name.lower() for g in GONE):
+            continue
+        lon, lat = (el["lon"], el["lat"]) if "lon" in el else (el.get("center", {}).get("lon"), el.get("center", {}).get("lat"))
+        if lon is None:
+            continue
+        bags, _ = place_point(lon, lat, 10)
+        artist = tags.get("artist_name") or tags.get("artist")
+        story = f"{name}{', by ' + artist if artist else ''}{', ' + tags['start_date'] if tags.get('start_date') else ''}."
+        url = f"https://www.openstreetmap.org/{el['type']}/{el['id']}"
+        out += [dict(name=name, qid=None, bag=b, story=story, source=url, how="osm", group="mapped") for b in bags
+                if b not in taken]
+    return out
 
 
 def main():
     out, dropped = [], []
     for L in CURATED:
         entries = []
-        for name, qid, story, ref, checks, nhle, *group in L["entries"]:
+        for e in L["entries"]:
+            if isinstance(e, dict):  # placed by its own coordinates (street art on a wall)
+                name, qid, story, ref, checks, nhle, group = (e["name"], e.get("qid"), e["story"], e["ref"], e["checks"],
+                                                              None, [e.get("group")])
+                bags, how = place_point(e["lon"], e["lat"], 30)
+            else:
+                name, qid, story, ref, checks, nhle, *group = e
+                # an estate's point often lies in its open ground: the nearest of its blocks within 60 m stands for it
+                bags, how = place(qid, nhle, 60 if "Estate" in name or L["id"] == "housing" else 15)
             text, url = article(ref)
             missing = [c for c in checks if c not in text]
-            bags, how = place(qid, nhle)
             if missing or not bags:
                 dropped.append((L["id"], name, missing, how))
                 continue
             for bag in bags:
                 entries.append(dict(name=name, qid=qid, bag=bag, story=story, source=url, how=how,
                                     group=group[0] if group and group[0] else L["id"]))
+        if L["id"] == "streetart":
+            entries += osm_streetart({e["bag"] for e in entries})
         out.append(dict({k: v for k, v in L.items() if k != "entries"}, entries=entries))
         print(f'{L["id"]:10s} {len({e["name"] for e in entries})}/{len(L["entries"])}  ({len(entries)} footprints)')
     for d in dropped:

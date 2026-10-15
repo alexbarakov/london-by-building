@@ -1241,3 +1241,55 @@ CURATED = [
              "1238982", "odd details"),
         ]),
 ]
+
+
+# ---------- deeper layers, researched separately (pipeline/drafts/) ----------
+# blitz.py replaces the layer above; harrypotter.py and streetart.py are new layers; expand_a.py and expand_b.py add
+# entries to existing layers; world_a.py and world_b.py are the country groups of 'The world in London'.
+import importlib.util as _ilu
+from pathlib import Path as _Path
+
+
+def _draft(name):
+    f = _Path(__file__).parent / "drafts" / f"{name}.py"
+    if not f.exists():
+        return None
+    spec = _ilu.spec_from_file_location(f"drafts.{name}", f)
+    m = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+for _name in ("blitz", "harrypotter", "streetart"):
+    _m = _draft(_name)
+    if _m:
+        CURATED[:] = [L for L in CURATED if L["id"] != _m.LAYER["id"]] + [_m.LAYER]
+
+for _name in ("expand_a", "expand_b"):
+    _m = _draft(_name)
+    if _m:
+        for _L in CURATED:
+            # OVERLAPS: buildings another layer also claims, with a story of this layer's own; a building may sit in
+            # several layers, each telling its part
+            _L["entries"] = (list(_L["entries"]) + list(_m.LAYERS.get(_L["id"], []))
+                             + list(getattr(_m, "OVERLAPS", {}).get(_L["id"], [])))
+
+_groups = {}
+for _name in ("world_a", "world_b"):
+    _m = _draft(_name)
+    if _m:
+        _groups.update(_m.GROUPS)
+# Eight colours a layer: Europe and the rest of the world are two layers.
+_EUROPE = ["russia", "france", "germany", "italy", "ireland", "poland", "greece"]
+for _id, _title, _keys, _intro in [
+    ("world-europe", "The world in London: Europe", [k for k in _EUROPE if k in _groups],
+     "Exiles, revolutionaries, refugees and traders from the rest of Europe, and the churches, clubs and embassies "
+     "they left. Each colour is a country; every building carries its own story and source."),
+    ("world", "The world in London: Asia, Africa, the Americas", [k for k in _groups if k not in _EUROPE],
+     "Students, sailors, campaigners and whole communities from across the empire and beyond. Each colour is a "
+     "country or a region; every building carries its own story and source."),
+]:
+    if _keys:
+        CURATED.append(dict(id=_id, section="Faith and community", title=_title, era="1600s–today", intro=_intro,
+                            groups=[(k, _groups[k][0]) for k in _keys],
+                            entries=[tuple(e[:6]) + (k,) for k in _keys for e in _groups[k][2]]))

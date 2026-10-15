@@ -44,10 +44,18 @@ def heritage():
     return {k: v for k, v in zip(b.bag, g) if v in ("I", "II*", "II")}
 
 
+# Layers whose groups get colours of their own; the others are one colour, as 64 bits do not cover every group.
+GROUPED = {"blitz", "world", "world-europe", "eastend", "potter", "streetart", "power", "modern"}
+GROUP_LABELS = {"mapped": "Mapped on OpenStreetMap"}
+
+
 def _curated_layer(L):
+    if L["id"] not in GROUPED:
+        L = dict(L, groups=None, entries=[dict(e, group=L["id"]) for e in L["entries"]])
     # a layer's groups are the group keys of its entries, in order of first appearance
     keys = list(dict.fromkeys(e["group"] for e in L["entries"]))
-    groups = L.get("groups") or [(k, k[:1].upper() + k[1:] if k != L["id"] else L["title"]) for k in keys]
+    groups = L.get("groups") or [(k, GROUP_LABELS.get(k, k[:1].upper() + k[1:]) if k != L["id"] else L["title"])
+                                 for k in keys]
 
     def fn():
         out = {}
