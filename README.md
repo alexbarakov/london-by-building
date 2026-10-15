@@ -36,6 +36,7 @@ open data ──► pipeline/ (Python) ──► web/data/ (binary tiles + JSON)
 | `s07_labels` | Street, river and canal names placed along their outlines |
 | `s08_curated` | Checks hand-written stories against Wikipedia and places them by their Wikidata item |
 | `s11_facts` | Checks the 'Did you know' facts the same way |
+| `s14_search` | Search index: named and listed buildings, listed buildings' addresses, and the buildings along every street (London has no open address register) |
 
 Raw inputs (not in the repository): `data/raw/boundary.json` (ONS borough boundaries), `overture_buildings.parquet`,
 `overture_roads.parquet` and `overture_water.parquet` (Overture Maps release 2026-09-23.1, fetched with DuckDB), and
