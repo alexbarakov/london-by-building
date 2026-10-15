@@ -18,7 +18,8 @@ from shapely.geometry import box
 
 LIDAR = Path("data/raw/lidar")
 SPIRE_MIN = 8.0     # metres above the prism
-TALL_MIN = 12.0     # metres: shorter buildings are left as they are
+TALL_MIN = 12.0     # metres: shorter listed, named or religious buildings are left as they are
+TALL_ANY = 30.0     # metres: any building taller than this is read too
 TOP_MIN = 35.0      # the first-return surface includes tree crowns, up to about 30 m in London: below this only
 TOP_MIN_TOWER = 25.0  # churches and buildings named for a tower count
 SHARE_MAX = 0.35    # tall cells over more of a footprint mean another, taller building stands over or beside it
@@ -58,7 +59,9 @@ def main():
                          columns=["identificatie", "height", "planning_list_id", "class", "name", "geometry"])
     # listed, a place of worship, or named (the landmarks: St Paul's and the Abbey carry no listing link here)
     tower = b["class"].isin(WORSHIP) | b.name.fillna("").str.contains(TOWERISH)
-    cand = b[(b.planning_list_id.notna() | tower | b.name.notna()) & (b.height > TALL_MIN)]
+    # ... and every tall building, whatever its name: the City's and Canary Wharf's towers are mostly unnamed here,
+    # and their crowns, setbacks and masts stand well above the prism
+    cand = b[((b.planning_list_id.notna() | tower | b.name.notna()) & (b.height > TALL_MIN)) | (b.height > TALL_ANY)]
     cand = cand.assign(tower=tower[cand.index])
     print(len(cand), "candidates")
     rows = []
