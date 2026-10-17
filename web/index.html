@@ -4,6 +4,18 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>LAYRS: London</title>
+<meta name="description" content="The 213,000 buildings of inner London in 3D, coloured by the year they were built, with context layers from the Great Fire to the new skyline. Every story with its source.">
+<link rel="canonical" href="https://stop-token.com/lab/london/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="LAYRS: London">
+<meta property="og:description" content="The 213,000 buildings of inner London in 3D, coloured by the year they were built, with context layers from the Great Fire to the new skyline. Every story with its source.">
+<meta property="og:url" content="https://stop-token.com/lab/london/">
+<meta property="og:image" content="https://stop-token.com/lab/london/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="alternate" type="text/csv" title="Buildings of inner London by construction year (CSV)" href="data/buildings.csv">
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebApplication", "name": "LAYRS: London", "url": "https://stop-token.com/lab/london/", "description": "The 213,000 buildings of inner London in 3D, coloured by the year they were built, with context layers from the Great Fire to the new skyline. Every story with its source.", "inLanguage": "en", "applicationCategory": "ReferenceApplication", "operatingSystem": "Any (web browser with WebGL)", "isAccessibleForFree": true, "image": "https://stop-token.com/lab/london/og.png", "about": {"@type": "City", "name": "London"}, "author": {"@type": "Person", "name": "Alex Barakov", "url": "https://www.linkedin.com/in/alexanderbarakov"}, "isBasedOn": {"@type": "CreativeWork", "name": "Paris, building by building", "url": "https://paris.bogachev.fr/", "author": {"@type": "Person", "name": "Alexander Bogachev"}}}, {"@type": "Dataset", "name": "Buildings of inner London by construction year", "description": "The 213,000 buildings of inner London in 3D, coloured by the year they were built, with context layers from the Great Fire to the new skyline. Every story with its source.", "url": "https://stop-token.com/lab/london/explore/", "spatialCoverage": {"@type": "Place", "name": "London"}, "creator": {"@type": "Person", "name": "Alex Barakov"}, "isAccessibleForFree": true, "distribution": [{"@type": "DataDownload", "encodingFormat": "text/csv", "contentUrl": "https://stop-token.com/lab/london/data/buildings.csv"}, {"@type": "DataDownload", "encodingFormat": "application/json", "contentUrl": "https://stop-token.com/lab/london/data/layers.json"}]}]}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;700;800&display=swap" rel="stylesheet">
@@ -11,6 +23,7 @@
 <script src="logo.js" defer></script>
 </head>
 <body>
+<noscript><p style="padding:24px;font:16px sans-serif">This map needs JavaScript. The same buildings and stories as plain pages: <a href="explore/">Explore London as pages</a></p></noscript>
 <canvas id="scene" aria-label="3D map of inner London's buildings"></canvas>
 <div class="veil veil-top" aria-hidden="true"></div>
 <div class="veil veil-bottom" aria-hidden="true"></div>
@@ -85,6 +98,7 @@
       <li>Names, photos, stories: Wikidata, Wikipedia, Wikimedia Commons; each photo credits its author and licence.</li>
       <li>Street names and water: OpenStreetMap contributors. ODbL.</li>
     </ul>
+    <p class="pages">Also as plain pages, for reading and for search engines: <a href="explore/">London, building by building</a>.</p>
     <h3>Method</h3>
     <p>London has no open register of construction years, so each building takes its date from the most precise open
     source that has one, and the card names it. An exact year is drawn in full colour; a range (a century in a listing,

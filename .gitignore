@@ -3,3 +3,6 @@ data/
 web/data/
 __pycache__/
 .claude/
+web/b/
+web/layers/
+web/explore/
